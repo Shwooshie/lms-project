@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: Any authenticated user can read, only owner can write
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Courses: 
+    match /courses/{courseId} {
+  allow read: if request.auth != null;
+
+  allow create: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lecturer'
+    && request.resource.data.lecturerId == request.auth.uid
+    && request.resource.data.lecturerName is string
+    && request.resource.data.lecturerName.size() > 0;
+
+  allow update, delete: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lecturer'
+    && resource.data.lecturerId == request.auth.uid;
+
+  // Allow any authenticated user to update only the 'students' field (enroll/unenroll)
+  allow update: if request.auth != null
+  	&& request.resource.data.keys().hasAll(['students'])
+  	&& request.resource.data.diff(resource.data).changedKeys().hasOnly(['students']);
+	}
+
+    // Materials: Only lecturers can write, all authenticated users can read
+    match /materials/{materialId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lecturer';
+    }
+
+    // Exercises: Only lecturers can write, all authenticated users can read
+    match /exercises/{exerciseId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lecturer';
+    }
+
+    // Solutions: Any authenticated user can read/write
+    match /solutions/{solutionId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Messages: Any authenticated user can read/write
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Activities: Any authenticated user can read/write
+    match /activities/{activityId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
